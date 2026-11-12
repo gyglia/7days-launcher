@@ -13,6 +13,9 @@ partial class Installer
     static int RunLauncher(string[] args)
     {
         ServicePointManager.SecurityProtocol |= SecurityProtocolType.Tls12;
+        if (args.Length == 2 && args[0] == "--apply-self-update") return ApplyAppUpdate(args[1]);
+        if (args.Length == 2 && args[0] == "--apply-self-update-test") return ApplyAppUpdate(args[1], true);
+        if (args.Length == 2 && args[0] == "--self-update-test") return TestAppUpdate(args[1]);
         if (args.Length == 2 && args[0] == "--launcher-test") return TestLauncher(args[1]);
         if (args.Length == 2 && args[0] == "--release-test") {
             try {
@@ -99,7 +102,7 @@ partial class Installer
         {
             folder.Text = String.IsNullOrEmpty(gameDir) ? "Папка игры не выбрана" : gameDir;
             folder.ToolTip = folder.Text;
-            version.Text = "Установлено: " + (installed == null ? "—" : String.IsNullOrEmpty(installed.Release) ? "прежняя сборка" : installed.Release) +
+            version.Text = "Лаунчер " + System.Reflection.Assembly.GetExecutingAssembly().GetName().Version.ToString(3) + " · Установлено: " + (installed == null ? "—" : String.IsNullOrEmpty(installed.Release) ? "прежняя сборка" : installed.Release) +
                 "\nДоступно: " + (remote == null ? "проверяем…" : remote.Version) + "   ·   Игра " + (remote ?? bundled).GameVersion;
             remove.IsEnabled = !busy && !launching && installed != null;
             browse.IsEnabled = retry.IsEnabled = !busy && !launching;
@@ -157,6 +160,14 @@ partial class Installer
             if (previewMode) { StartDemoUpdate(); return; }
             remote = null;
             Work(report => {
+                try {
+                    var appUpdate = DownloadAppUpdate(appDir, report);
+                    if (appUpdate != null) return (object)appUpdate;
+                } catch (Exception error) {
+                    // An unavailable app release must not prevent playing or updating mods.
+                    Directory.CreateDirectory(appDir);
+                    File.WriteAllText(Path.Combine(appDir, "self-update-error.txt"), error.ToString());
+                }
                 Receipt local = ReadReceipt(dataDir);
                 ReleaseManifest release; string text;
                 try { text = FetchManifest(); release = ParseManifest(text); }
@@ -166,6 +177,21 @@ partial class Installer
                 }
                 SaveText(CachedManifest, text); return Tuple.Create(release, local, false);
             }, result => {
+                var appUpdate = result as AppUpdate;
+                if (appUpdate != null) {
+                    try {
+                        string stage = Path.GetDirectoryName(appUpdate.Candidate);
+                        string helper = Path.Combine(stage, "updater.exe");
+                        string plan = Path.Combine(stage, "plan.json");
+                        File.Copy(WF.Application.ExecutablePath, helper);
+                        File.WriteAllText(plan, Json.Serialize(appUpdate));
+                        using (var process = Process.Start(new ProcessStartInfo(helper, "--apply-self-update \"" + plan + "\"") { UseShellExecute = false, WorkingDirectory = stage })) {
+                            if (process == null) throw new IOException("Не удалось запустить обновление лаунчера.");
+                        }
+                        Close();
+                    } catch (Exception error) { RenderState(); SetError(error); }
+                    return;
+                }
                 var state = (Tuple<ReleaseManifest, Receipt, bool>)result;
                 remote = state.Item1; installed = state.Item2; offline = state.Item3; RenderState();
                 TryAutomaticUpdate();

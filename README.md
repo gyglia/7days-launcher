@@ -20,7 +20,8 @@
 - Моды и резервная копия заменяемых файлов: `%APPDATA%\7DaysToDie`.
 - Журналы подключения: `%LOCALAPPDATA%\JAGO\logs\join-*.log`.
 - Обновления модов: [gyglia/jago-releases](https://github.com/gyglia/jago-releases). Версия приложения `1.0.0` и версия комплекта модов `sever2026.1` независимы.
-- Новые версии самого лаунчера скачиваются из Releases вручную.
+- Начиная с `1.1.0`, лаунчер автоматически проверяет стабильный последний релиз этого репозитория при открытии и через кнопку «Проверить». Новая версия скачивается с прогрессом, проверяется по SHA-256 из GitHub API и версии внутри EXE, затем устанавливается с перезапуском. Обновляются запущенная и установленная копии. При ошибке замены выполняется откат. Недоступность GitHub не мешает обычному запуску. Ошибки проверки записываются в `%LOCALAPPDATA%\JAGO\self-update-error.txt`, ошибки замены — в `%LOCALAPPDATA%\JAGO\updates\<идентификатор>\error.txt`.
+- Пользователям `1.0.0` нужно один раз скачать `1.1.0` вручную: в первом релизе механизма самообновления ещё нет.
 
 ## Сборка
 
@@ -41,9 +42,14 @@ powershell -NoProfile -ExecutionPolicy Bypass -File installer/build-launcher.ps1
 ```powershell
 Start-Process .\dist\JAGO-Launcher.exe -ArgumentList '--ui-test dist\ui-test.txt' -Wait
 Start-Process .\dist\JAGO-Launcher.exe -ArgumentList '--launcher-test dist\launcher-test.txt' -Wait
-Get-Content .\dist\ui-test.txt, .\dist\launcher-test.txt
+Start-Process .\dist\JAGO-Launcher.exe -ArgumentList '--self-update-test dist\self-update-test.txt' -Wait
+Get-Content .\dist\ui-test.txt, .\dist\launcher-test.txt, .\dist\self-update-test.txt
 ```
 
 Проверки интерфейса не запускают игру. Проверка установки работает в отдельной временной папке. `--demo` открывает безопасную демонстрацию интерфейса. Реальное соединение с сервером требует установленной игры, авторизации Steam и доступного сервера.
 
 Исходники интерфейса: `installer/LauncherDesign.cs`; запуск и состояния: `installer/LauncherWindow.cs`; обновления: `installer/LauncherRelease.cs`. Сторонние моды принадлежат их авторам; этот репозиторий не меняет условия их использования.
+
+## Выпуск версии лаунчера
+
+Обновите обе версии в `installer/AssemblyInfo.cs`, соберите и проверьте EXE. Создайте стабильный GitHub Release с тегом `vX.Y.Z`, совпадающим с версией EXE `X.Y.Z.0`, и приложите `JAGO-Launcher.exe`. GitHub должен вернуть `digest` формата `sha256:…` для этого файла. Сначала загрузите файл в черновик, проверьте digest и только затем публикуйте релиз как Latest. Предварительные версии и понижение версии не устанавливаются. Архив исходных модов остаётся доступным в `v1.0.0`.

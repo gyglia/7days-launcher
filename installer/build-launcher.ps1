@@ -81,7 +81,7 @@ try {
     foreach ($package in $packages) {
         $arguments += "/resource:$($stage.FullName)\$($package.Name),$($package.Name)"
     }
-    foreach ($sourceFile in @('AssemblyInfo.cs', 'Installer.cs', 'LauncherRelease.cs', 'LauncherWindow.cs', 'LauncherDesign.cs', 'LauncherPreview.cs', 'LauncherTest.cs')) {
+    foreach ($sourceFile in @('AssemblyInfo.cs', 'Installer.cs', 'LauncherRelease.cs', 'LauncherSelfUpdate.cs', 'LauncherWindow.cs', 'LauncherDesign.cs', 'LauncherPreview.cs', 'LauncherTest.cs')) {
         $arguments += Join-Path $PSScriptRoot $sourceFile
     }
     & $compiler @arguments
