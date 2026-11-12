@@ -209,7 +209,7 @@ partial class Installer
             Closing += delegate(object sender, System.ComponentModel.CancelEventArgs e) { if (busy || launching) { e.Cancel = true; Notify("Дождитесь завершения операции"); } };
             Closed += delegate { Dispose(); };
             if (preview) SetPreviewState("ready");
-            else { gameDir = SavedGame(); RenderState(); Loaded += delegate { CheckRelease(); }; }
+            else { gameDir = SavedGame(); RenderState(); Loaded += delegate { StartScheduleTimer(); CheckRelease(); }; }
         }
 
         static SolidColorBrush Brush(string hex) { var brush = (SolidColorBrush)new BrushConverter().ConvertFromString(hex); brush.Freeze(); return brush; }

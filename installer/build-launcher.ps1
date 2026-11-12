@@ -82,7 +82,7 @@ try {
     $packageOutput = Join-Path $dist 'packages'
     New-Item -ItemType Directory -Path $packageOutput -Force | Out-Null
     foreach ($package in $packages) { Copy-Item -LiteralPath (Join-Path $stage.FullName $package.Name) -Destination (Join-Path $packageOutput $package.Name) -Force }
-    foreach ($sourceFile in @('AssemblyInfo.cs', 'Installer.cs', 'LauncherRelease.cs', 'LauncherSelfUpdate.cs', 'LauncherManualUpdate.cs', 'LauncherWindow.cs', 'LauncherDesign.cs', 'LauncherPreview.cs', 'LauncherTest.cs')) {
+    foreach ($sourceFile in @('AssemblyInfo.cs', 'Installer.cs', 'LauncherRelease.cs', 'LauncherSchedule.cs', 'LauncherSelfUpdate.cs', 'LauncherManualUpdate.cs', 'LauncherWindow.cs', 'LauncherDesign.cs', 'LauncherPreview.cs', 'LauncherTest.cs')) {
         $arguments += Join-Path $PSScriptRoot $sourceFile
     }
     & $compiler @arguments

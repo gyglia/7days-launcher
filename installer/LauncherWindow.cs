@@ -17,6 +17,7 @@ partial class Installer
         if (args.Length == 2 && args[0] == "--apply-self-update-test") return ApplyAppUpdate(args[1], true);
         if (args.Length == 2 && args[0] == "--self-update-test") return TestAppUpdate(args[1]);
         if (args.Length == 2 && args[0] == "--launcher-test") return TestLauncher(args[1]);
+        if (args.Length == 2 && args[0] == "--schedule-test") return TestSchedule(args[1]);
         if (args.Length == 2 && args[0] == "--release-test") {
             try {
                 string text = FetchManifest();
@@ -170,14 +171,7 @@ partial class Installer
                     Directory.CreateDirectory(appDir);
                     File.WriteAllText(Path.Combine(appDir, "self-update-error.txt"), error.ToString());
                 }
-                Receipt local = ReadReceipt(dataDir);
-                ReleaseManifest release; string text;
-                try { text = FetchManifest(); release = ParseManifest(text); }
-                catch (WebException) {
-                    release = File.Exists(CachedManifest) ? ParseManifest(File.ReadAllText(CachedManifest)) : bundled;
-                    return Tuple.Create(release, local, true);
-                }
-                SaveText(CachedManifest, text); return Tuple.Create(release, local, false);
+                return (object)LoadScheduledRelease();
             }, result => {
                 var appUpdate = result as AppUpdate;
                 if (appUpdate != null) {
@@ -194,8 +188,8 @@ partial class Installer
                     } catch (Exception error) { RenderState(); SetError(error); }
                     return;
                 }
-                var state = (Tuple<ReleaseManifest, Receipt, bool>)result;
-                remote = state.Item1; installed = state.Item2; offline = state.Item3; RenderState();
+                var state = (Tuple<ReleaseManifest, bool, ReleaseManifest>)result;
+                remote = state.Item1; installed = ReadReceipt(dataDir); offline = state.Item2; scheduledRelease = state.Item3; RenderState();
                 TryAutomaticUpdate();
             }, "Проверяем обновления");
         }
@@ -236,6 +230,19 @@ partial class Installer
 
         void Play()
         {
+            if (previewMode) { PlayVerified(); return; }
+            if (busy || launching || !ready || !HasGame()) return;
+            if (GameRunning()) { Notify("Игра уже запущена"); return; }
+            Work(report => LoadScheduledRelease(),result => {
+                var state = (Tuple<ReleaseManifest,bool,ReleaseManifest>)result;
+                remote = state.Item1; offline = state.Item2; scheduledRelease = state.Item3;
+                installed = ReadReceipt(dataDir); RenderState();
+                if (ready) PlayVerified(); else TryAutomaticUpdate();
+            },"Проверка расписания");
+        }
+
+        void PlayVerified()
+        {
             if (busy || launching || !ready || !HasGame()) return;
             if (!previewMode && GameRunning()) { Notify("Игра уже запущена"); return; }
             HideSettings(); launching = true; RenderState(); status.Text = "";
@@ -245,6 +252,9 @@ partial class Installer
                 if (previewMode) { launching = false; RenderState(); return; }
                 EnsureSteam(delegate {
                 try {
+                    if (scheduledRelease != null && ReleaseIsDue(scheduledRelease,DateTimeOffset.UtcNow)) {
+                        launching = false; RenderState(); Play(); return;
+                    }
                     if (GameRunning()) throw new IOException("Игра уже запущена.");
                     string logs = Path.Combine(appDir, "logs"); Directory.CreateDirectory(logs);
                     string log = Path.Combine(logs, "join-" + DateTime.Now.ToString("yyyyMMdd-HHmmss") + "-" + Guid.NewGuid().ToString("N") + ".log");

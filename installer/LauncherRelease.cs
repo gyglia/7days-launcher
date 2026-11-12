@@ -22,6 +22,9 @@ partial class Installer
         public string GameVersion { get; set; }
         public string Notes { get; set; }
         public ModPackage[] Packages { get; set; }
+        public string ActivationMode { get; set; }
+        public string ActivateAt { get; set; }
+        public string PreviousManifestUrl { get; set; }
     }
 
     public class ModPackage
@@ -46,7 +49,7 @@ partial class Installer
     static ReleaseManifest ParseManifest(string text)
     {
         var manifest = new JavaScriptSerializer().Deserialize<ReleaseManifest>(text);
-        if (manifest == null || manifest.Schema != 1 ||
+        if (manifest == null || (manifest.Schema != 1 && manifest.Schema != 2) ||
             !Regex.IsMatch(manifest.Version ?? "", @"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$") ||
             !Regex.IsMatch(manifest.GameVersion ?? "", @"^\d+(\.\d+){1,3}$") ||
             manifest.Packages == null || manifest.Packages.Length == 0 || manifest.Packages.Length > 200)
@@ -68,6 +71,7 @@ partial class Installer
                 !Regex.IsMatch(package.Url, "^" + Regex.Escape(ReleaseRoot) + @"download/[A-Za-z0-9._-]+/[A-Za-z0-9._-]+\.zip$"))
                 throw new IOException("Неизвестный адрес пакета " + package.Name + ".");
         }
+        ValidateSchedule(manifest);
         return manifest;
     }
 
@@ -83,7 +87,12 @@ partial class Installer
 
     static string FetchManifest()
     {
-        using (var response = GitHubRequest(ManifestUrl, 8000).GetResponse())
+        return FetchManifestAt(ManifestUrl);
+    }
+
+    static string FetchManifestAt(string url)
+    {
+        using (var response = GitHubRequest(url, 8000).GetResponse())
         using (var stream = response.GetResponseStream())
         using (var memory = new MemoryStream())
         {

@@ -46,6 +46,7 @@ partial class Installer
         Directory.CreateDirectory(stage);
         try {
             var release = ReadOfflineBundle(archive,stage,report);
+            if (!ReleaseIsDue(release,DateTimeOffset.UtcNow)) throw new IOException("Эта сборка станет доступна " + release.ActivateAt + " (Москва). До этого используйте прежнюю сборку.");
             if (release.GameVersion != bundled.GameVersion) throw new IOException("Архив предназначен для другой версии игры: " + release.GameVersion);
             ApplyRelease(release,bundled,game,data,desktop,executable,(p,t) => report(35 + p * 65 / 100,t),
                 package => Path.Combine(stage,package.Name),beforeCommit);
