@@ -34,6 +34,9 @@ partial class Installer
         public long Bytes { get; set; }
         public string[] Folders { get; set; }
         public string Url { get; set; }
+        public string FileIndexUrl { get; set; }
+        public string FileIndexSha256 { get; set; }
+        public long FileIndexBytes { get; set; }
     }
 
     static Stream OpenResource(string name)
@@ -190,9 +193,27 @@ partial class Installer
 
     static string ApplyRelease(ReleaseManifest release, ReleaseManifest bundled, string gameDir, string dataDir,
         string desktop, string launcherExe, Action<int,string> report, Func<ModPackage,string> localArchive = null,
-        Action beforeCommit = null)
+        Action beforeCommit = null, Func<ModPackage,byte[]> fileIndex = null)
     {
-        var changed = ChangedPackages(release, ReadReceipt(dataDir), dataDir);
+        var current = ReadReceipt(dataDir);
+        var adopted = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var indexes = new Dictionary<string,byte[]>(StringComparer.OrdinalIgnoreCase);
+        Func<ModPackage,byte[]> cachedIndex = package => {
+            byte[] bytes;
+            if (!indexes.TryGetValue(package.Name,out bytes)) {
+                bytes = fileIndex == null ? DownloadFileIndex(package) : fileIndex(package);
+                indexes[package.Name] = bytes;
+            }
+            return bytes;
+        };
+        if (current != null && current.Packages == null) {
+            foreach (var package in release.Packages) {
+                if (!package.Folders.All(f => current.Names.Contains(f,StringComparer.OrdinalIgnoreCase))) continue;
+                report(2,"Проверка установленного мода " + package.Name);
+                if (MatchesInstalledPackage(package,dataDir,cachedIndex)) adopted.Add(package.Name);
+            }
+        }
+        var changed = ChangedPackages(release, current, dataDir).Where(p => !adopted.Contains(p.Name)).ToArray();
         var desired = new Receipt
         {
             Release = release.Version,
@@ -230,6 +251,8 @@ partial class Installer
                 Directory.Delete(scratch);
             }
             if (beforeCommit != null) beforeCommit();
+            foreach (var package in release.Packages.Where(p => adopted.Contains(p.Name)))
+                if (!MatchesInstalledPackage(package,dataDir,cachedIndex)) throw new IOException("Файлы мода изменились во время проверки: " + package.Name + ". Повторите обновление.");
         }, desired, launcherExe);
     }
 

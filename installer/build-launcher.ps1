@@ -43,12 +43,29 @@ try {
                         }
                     }
                     finally { $archive.Dispose() }
+                    $zipForIndex = [IO.Compression.ZipFile]::OpenRead($path)
+                    try {
+                        $fileIndexEntries = @(foreach ($entry in $zipForIndex.Entries) {
+                            if (-not $entry.Name -or -not $entry.FullName.Contains('/')) { continue }
+                            $stream = $entry.Open(); $sha = [Security.Cryptography.SHA256]::Create()
+                            try { $fileHash = [BitConverter]::ToString($sha.ComputeHash($stream)).Replace('-','') }
+                            finally { $stream.Dispose(); $sha.Dispose() }
+                            [ordered]@{ Path = $entry.FullName; Bytes = $entry.Length; Sha256 = $fileHash }
+                        })
+                    } finally { $zipForIndex.Dispose() }
+                    $packageHash = (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash
+                    $indexPath = Join-Path $stage.FullName ($name + '.files.json')
+                    $fileIndex = [ordered]@{ PackageSha256 = $packageHash; Files = $fileIndexEntries }
+                    [IO.File]::WriteAllText($indexPath,($fileIndex | ConvertTo-Json -Depth 6 -Compress),[Text.UTF8Encoding]::new($false))
                     [ordered]@{
                         Name = $name
                         Sha256 = (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash
                         Bytes = (Get-Item -LiteralPath $path).Length
                         Folders = @($folder)
                         Url = "https://github.com/gyglia/jago-releases/releases/download/sever2026.1/$name"
+                        FileIndexUrl = "https://github.com/gyglia/jago-releases/releases/download/sever2026.1/$name.files.json"
+                        FileIndexSha256 = (Get-FileHash -LiteralPath $indexPath -Algorithm SHA256).Hash
+                        FileIndexBytes = (Get-Item -LiteralPath $indexPath).Length
                     }
                 }
             }
@@ -82,7 +99,8 @@ try {
     $packageOutput = Join-Path $dist 'packages'
     New-Item -ItemType Directory -Path $packageOutput -Force | Out-Null
     foreach ($package in $packages) { Copy-Item -LiteralPath (Join-Path $stage.FullName $package.Name) -Destination (Join-Path $packageOutput $package.Name) -Force }
-    foreach ($sourceFile in @('AssemblyInfo.cs', 'Installer.cs', 'LauncherRelease.cs', 'LauncherSchedule.cs', 'LauncherSelfUpdate.cs', 'LauncherManualUpdate.cs', 'LauncherWindow.cs', 'LauncherDesign.cs', 'LauncherPreview.cs', 'LauncherTest.cs')) {
+    foreach ($package in $packages) { Copy-Item -LiteralPath (Join-Path $stage.FullName ($package.Name + '.files.json')) -Destination (Join-Path $packageOutput ($package.Name + '.files.json')) -Force }
+    foreach ($sourceFile in @('AssemblyInfo.cs', 'Installer.cs', 'LauncherRelease.cs', 'LauncherMigration.cs', 'LauncherSchedule.cs', 'LauncherSelfUpdate.cs', 'LauncherManualUpdate.cs', 'LauncherWindow.cs', 'LauncherDesign.cs', 'LauncherPreview.cs', 'LauncherTest.cs')) {
         $arguments += Join-Path $PSScriptRoot $sourceFile
     }
     & $compiler @arguments

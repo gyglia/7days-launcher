@@ -40,7 +40,44 @@ partial class Installer
             Receipt legacy = ReadReceipt(data);
             Require(legacy.Packages == null, "Legacy receipt fixture");
             string executable = Process.GetCurrentProcess().MainModule.FileName;
-            ApplyRelease(bundled, bundled, game, data, desktop, executable, progress, p => Path.Combine(packageFiles,p.Name));
+            Func<ModPackage,byte[]> indexReader = p => File.ReadAllBytes(Path.Combine(packageFiles,p.Name + ".files.json"));
+            Require(bundled.Packages.All(p => MatchesInstalledPackage(p,data,indexReader)),"Legacy files match all published indexes");
+            var firstPackage = bundled.Packages[0];
+            string firstFile = Path.Combine(mods,firstPackage.Folders[0],"ModInfo.xml");
+            byte[] originalBytes = File.ReadAllBytes(firstFile), modifiedBytes = (byte[])originalBytes.Clone();
+            modifiedBytes[0] ^= 1; File.WriteAllBytes(firstFile,modifiedBytes);
+            Require(!MatchesInstalledPackage(firstPackage,data,indexReader),"Same-size content modification detected");
+            File.WriteAllBytes(firstFile,originalBytes);
+            Require(!MatchesInstalledPackage(firstPackage,data,p => new byte[0]),"Corrupt index rejected");
+            var oldHash = firstPackage.FileIndexSha256; firstPackage.FileIndexSha256 = new string('0',64);
+            Require(!MatchesInstalledPackage(firstPackage,data,indexReader),"Untrusted index hash rejected"); firstPackage.FileIndexSha256 = oldHash;
+            ApplyRelease(bundled, bundled, game, data, desktop, executable, progress,
+                p => { throw new Exception("Matching legacy package must not be downloaded: " + p.Name); },fileIndex:indexReader);
+            Require(ReadReceipt(data).Baseline == legacy.Baseline,"Adoption retains original baseline");
+            File.WriteAllText(StatePath(data),Json.Serialize(legacy));
+            bool raced = false;
+            try {
+                ApplyRelease(bundled,bundled,game,data,desktop,executable,progress,p => { throw new Exception("Unexpected download"); },
+                    beforeCommit:() => File.WriteAllBytes(firstFile,modifiedBytes),fileIndex:indexReader);
+            } catch(IOException) { raced = true; }
+            Require(raced && ReadReceipt(data).Packages == null,"Files changed during migration do not get a trusted receipt");
+            File.WriteAllBytes(firstFile,originalBytes);
+
+            // Restore only the fixture receipt to exercise a partially changed legacy install.
+            File.WriteAllText(StatePath(data),Json.Serialize(legacy));
+            string altered = Path.Combine(mods,bundled.Packages[0].Folders[0],"ModInfo.xml");
+            string missing = Path.Combine(mods,bundled.Packages[1].Folders[0],"ModInfo.xml");
+            string extra = Path.Combine(mods,bundled.Packages[2].Folders[0],"unexpected-file.txt");
+            File.AppendAllText(altered," "); File.Delete(missing); File.WriteAllText(extra,"unexpected");
+            Require(!MatchesInstalledPackage(bundled.Packages[0],data,indexReader),"Changed file detected");
+            Require(!MatchesInstalledPackage(bundled.Packages[1],data,indexReader),"Missing file detected");
+            Require(!MatchesInstalledPackage(bundled.Packages[2],data,indexReader),"Extra file detected");
+            var requested = new System.Collections.Generic.List<string>();
+            ApplyRelease(bundled,bundled,game,data,desktop,executable,progress,p => {
+                requested.Add(p.Name); return Path.Combine(packageFiles,p.Name);
+            },fileIndex:indexReader);
+            Require(requested.Count == 3 && requested.OrderBy(n=>n).SequenceEqual(bundled.Packages.Take(3).Select(p=>p.Name).OrderBy(n=>n)),"Only three changed legacy packages downloaded");
+            Require(!File.Exists(extra) && Directory.GetFiles(data,"unexpected-file.txt",SearchOption.AllDirectories).Length == 1,"Extra file retained in rollback backup, removed from active mod");
             Receipt baseline = ReadReceipt(data);
             Require(baseline.Baseline == legacy.Baseline, "Legacy backup retained");
             Require(IsCurrent(bundled, baseline, ChangedPackages(bundled, baseline, data)), "Bundled installation");
@@ -105,7 +142,7 @@ partial class Installer
             Uninstall(data, desktop, progress);
             Require(File.Exists(original) && Directory.Exists(unrelated) && ReadReceipt(data) == null, "Uninstall restores original files");
             Directory.Delete(root, true);
-            File.WriteAllText(log, "PASS: legacy migration, baseline install, launcher shortcut, changed package only, corrupt archive isolation, offline ZIP install without network, offline pre-commit failure isolation, incomplete/unsafe ZIP rejection, package removal and original mod restoration.");
+            File.WriteAllText(log, "PASS: legacy adoption with zero downloads, index validation, changed/missing/extra files detected, only changed legacy packages downloaded, original baseline and unrelated mods retained, extra files backed up, launcher shortcut, changed package only, corrupt archive isolation, offline ZIP install, failure isolation, package removal and original mod restoration.");
             return 0;
         }
         catch (Exception error)
