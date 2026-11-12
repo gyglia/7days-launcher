@@ -81,11 +81,20 @@ try {
     foreach ($package in $packages) {
         $arguments += "/resource:$($stage.FullName)\$($package.Name),$($package.Name)"
     }
-    foreach ($sourceFile in @('AssemblyInfo.cs', 'Installer.cs', 'LauncherRelease.cs', 'LauncherSelfUpdate.cs', 'LauncherWindow.cs', 'LauncherDesign.cs', 'LauncherPreview.cs', 'LauncherTest.cs')) {
+    foreach ($sourceFile in @('AssemblyInfo.cs', 'Installer.cs', 'LauncherRelease.cs', 'LauncherSelfUpdate.cs', 'LauncherManualUpdate.cs', 'LauncherWindow.cs', 'LauncherDesign.cs', 'LauncherPreview.cs', 'LauncherTest.cs')) {
         $arguments += Join-Path $PSScriptRoot $sourceFile
     }
     & $compiler @arguments
     if ($LASTEXITCODE -ne 0) { throw 'Launcher compilation failed' }
+    $offlinePath = Join-Path $dist 'Sever2026-offline.zip'
+    if (Test-Path -LiteralPath $offlinePath) { Remove-Item -LiteralPath $offlinePath }
+    $offlineZip = [IO.Compression.ZipFile]::Open($offlinePath, [IO.Compression.ZipArchiveMode]::Create)
+    try {
+        [IO.Compression.ZipFileExtensions]::CreateEntryFromFile($offlineZip, $manifestPath, 'manifest.json') | Out-Null
+        foreach ($package in $packages) {
+            [IO.Compression.ZipFileExtensions]::CreateEntryFromFile($offlineZip, (Join-Path $stage.FullName $package.Name), $package.Name, [IO.Compression.CompressionLevel]::NoCompression) | Out-Null
+        }
+    } finally { $offlineZip.Dispose() }
     Get-FileHash -LiteralPath $output -Algorithm SHA256
 }
 finally {

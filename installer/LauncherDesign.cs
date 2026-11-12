@@ -160,9 +160,9 @@ partial class Installer
             blood.Clip = new RectangleGeometry(new Rect(0, 0, SceneWidth, 575));
             scene.Children.Add(blood);
 
-            settingsPanel = new Border { Width = 468, Height = 359, CornerRadius = new CornerRadius(14), Background = Brush("#FA17191B"),
+            settingsPanel = new Border { Width = 468, Height = 414, CornerRadius = new CornerRadius(14), Background = Brush("#FA17191B"),
                 BorderBrush = Brush("#66605B55"), BorderThickness = new Thickness(1), Visibility = Visibility.Collapsed };
-            var panel = new Canvas(); settingsPanel.Child = panel; Place(settingsPanel, 234, 205, scene);
+            var panel = new Canvas(); settingsPanel.Child = panel; Place(settingsPanel, 234, 150, scene);
             panelTitle = TextAt("Настройки", 25, 20, 365, 30, 20, panel);
             var dismiss = ButtonAt("×", 408, 14, 38, 36, panel); dismiss.FontSize = 21;
             dismiss.Padding = new Thickness(0);
@@ -180,6 +180,12 @@ partial class Installer
             settingsContent.Children.Add(effectsBox);
             effectsBox.Checked += delegate { effects = true; SetAtmosphere(busy ? "updating" : "idle", false); play.Cursor = Cursors.Hand; };
             effectsBox.Unchecked += delegate { effects = false; SetAtmosphere("idle", true); blood.Children.Clear(); play.Cursor = Cursors.Hand; };
+            var manualRow = new StackPanel { Orientation = Orientation.Horizontal }; settingsContent.Children.Add(manualRow);
+            chooseArchive = SmallButton("Выбрать архив", manualRow); applyArchive = SmallButton("Готово", manualRow);
+            chooseArchive.Click += delegate { ChooseManualArchive(); }; applyArchive.Click += delegate { InstallManualArchive(); };
+            archiveName = new TextBlock { Text = "Архив не выбран", Foreground = Brush("#9F9F9C"), FontSize = 11,
+                TextTrimming = TextTrimming.CharacterEllipsis, Height = 18, Margin = new Thickness(0, 3, 0, 8) };
+            settingsContent.Children.Add(archiveName);
             var secondRow = new StackPanel { Orientation = Orientation.Horizontal }; settingsContent.Children.Add(secondRow);
             var releases = SmallButton("Что нового ↗", secondRow); remove = SmallButton("Удалить сборку", secondRow);
             var lastRow = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 12, 0, 0) }; settingsContent.Children.Add(lastRow);

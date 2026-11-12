@@ -106,6 +106,8 @@ partial class Installer
                 "\nДоступно: " + (remote == null ? "проверяем…" : remote.Version) + "   ·   Игра " + (remote ?? bundled).GameVersion;
             remove.IsEnabled = !busy && !launching && installed != null;
             browse.IsEnabled = retry.IsEnabled = !busy && !launching;
+            chooseArchive.IsEnabled = !busy && !launching;
+            applyArchive.IsEnabled = !busy && !launching && HasGame() && !String.IsNullOrEmpty(manualArchive);
             update.IsEnabled = !busy && !launching;
             ready = remote != null && installed != null && IsCurrent(remote, installed, ViewChanges());
             play.IsEnabled = !busy && !launching && ready && HasGame();

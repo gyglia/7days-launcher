@@ -132,6 +132,10 @@ partial class Installer
         {
             try {
                 SetPreviewState("ready"); Require(play.IsEnabled && update.IsEnabled, "Ready actions"); Require(play.ToolTip == null, "Play has no tooltip");
+                Require(chooseArchive.IsEnabled && !applyArchive.IsEnabled, "Archive required before manual update");
+                manualArchive = "test.zip"; RenderState(); Require(applyArchive.IsEnabled,"Selected archive enables confirmation");
+                SetPreviewState("busy"); Require(!chooseArchive.IsEnabled && !applyArchive.IsEnabled,"Manual update blocked while busy");
+                manualArchive = null; SetPreviewState("ready");
                 Require(scene.Children.OfType<System.Windows.Controls.Button>().Count(b => b.Visibility == Visibility.Visible) == 2, "Only play and settings visible");
                 int initialZombieFrame = zombieFrame; Pump(100);
                 Require(zombieFrame != initialZombieFrame, "Zombie animation advances");
