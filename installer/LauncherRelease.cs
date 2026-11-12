@@ -124,7 +124,7 @@ partial class Installer
 
     static bool IsBundled(ModPackage package, ReleaseManifest bundled)
     {
-        return bundled.Packages.Any(candidate => candidate.Name == package.Name &&
+        return Assembly.GetExecutingAssembly().GetManifestResourceNames().Contains(package.Name) && bundled.Packages.Any(candidate => candidate.Name == package.Name &&
             candidate.Bytes == package.Bytes && String.Equals(candidate.Sha256, package.Sha256, StringComparison.OrdinalIgnoreCase));
     }
 

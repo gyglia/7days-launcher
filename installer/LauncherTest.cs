@@ -30,13 +30,17 @@ partial class Installer
             File.WriteAllText(Path.Combine(game, "7DaysToDie.exe"), "test fixture");
             File.WriteAllText(original, "original mod");
             var bundled = ParseManifest(ResourceText("manifest.json"));
+            string packageFiles = Path.Combine(Path.GetDirectoryName(System.Windows.Forms.Application.ExecutablePath),"packages");
+            Require(!System.Reflection.Assembly.GetExecutingAssembly().GetManifestResourceNames().Any(n => n.EndsWith(".zip")),"Launcher contains no mod archives");
             Require(bundled.Packages.Sum(p => p.Folders.Length) == ModCount, "Baseline folder count");
             Action<int,string> progress = (percent, status) => {};
-            Install(game, data, desktop, progress);
+            Install(game, data, desktop, progress, stage => {
+                foreach (var package in bundled.Packages) Extract(File.OpenRead(Path.Combine(packageFiles,package.Name)),stage);
+            });
             Receipt legacy = ReadReceipt(data);
             Require(legacy.Packages == null, "Legacy receipt fixture");
             string executable = Process.GetCurrentProcess().MainModule.FileName;
-            ApplyRelease(bundled, bundled, game, data, desktop, executable, progress);
+            ApplyRelease(bundled, bundled, game, data, desktop, executable, progress, p => Path.Combine(packageFiles,p.Name));
             Receipt baseline = ReadReceipt(data);
             Require(baseline.Baseline == legacy.Baseline, "Legacy backup retained");
             Require(IsCurrent(bundled, baseline, ChangedPackages(bundled, baseline, data)), "Bundled installation");
@@ -74,7 +78,7 @@ partial class Installer
             using (var zip = ZipFile.Open(offlineZip,ZipArchiveMode.Create)) {
                 using (var writer = new StreamWriter(zip.CreateEntry("manifest.json").Open())) writer.Write(Json.Serialize(release));
                 foreach (var package in release.Packages) {
-                    using (var input = package.Name == changed.Name ? File.OpenRead(archivePath) : OpenResource(package.Name))
+                    using (var input = File.OpenRead(package.Name == changed.Name ? archivePath : Path.Combine(packageFiles,package.Name)))
                     using (var output = zip.CreateEntry(package.Name,CompressionLevel.NoCompression).Open()) input.CopyTo(output);
                 }
             }

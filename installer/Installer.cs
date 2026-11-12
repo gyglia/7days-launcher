@@ -159,12 +159,16 @@ partial class Installer : Form
             !Regex.IsMatch(name.Split('.')[0].TrimEnd(),@"^(CON|PRN|AUX|NUL|COM[1-9¹²³]|LPT[1-9¹²³])$",RegexOptions.IgnoreCase);
     }
     static string[] PayloadNames() {
+#if LAUNCHER
+        return ParseManifest(ResourceText("manifest.json")).Packages.SelectMany(p => p.Folders).Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(n => n,StringComparer.Ordinal).ToArray();
+#else
         var names=new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach(string resource in Resources)
             using(Stream stream=Assembly.GetExecutingAssembly().GetManifestResourceStream(resource))
             using(var zip=new ZipArchive(stream,ZipArchiveMode.Read))
                 foreach(var e in zip.Entries) { string name=e.FullName.Split('/')[0]; if(e.FullName.Contains("/")) names.Add(name); }
         return names.OrderBy(n=>n,StringComparer.Ordinal).ToArray();
+#endif
     }
     static void CopyTree(string source,string target) {
         if((File.GetAttributes(source)&FileAttributes.ReparsePoint)!=0) throw new IOException("Ссылки в папках модов не поддерживаются.");

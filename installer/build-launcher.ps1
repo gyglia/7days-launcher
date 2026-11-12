@@ -48,6 +48,7 @@ try {
                         Sha256 = (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash
                         Bytes = (Get-Item -LiteralPath $path).Length
                         Folders = @($folder)
+                        Url = "https://github.com/gyglia/jago-releases/releases/download/sever2026.1/$name"
                     }
                 }
             }
@@ -78,9 +79,9 @@ try {
         "/resource:$PSScriptRoot\assets\PorchLamp-Off.png,PorchLamp-Off.png",
         "/resource:$PSScriptRoot\assets\SevenDaysButton-Idle.png,SevenDaysButton-Idle.png",
         "/win32icon:$PSScriptRoot\JAGO.ico", "/resource:$PSScriptRoot\JAGO.ico,JAGO.ico")
-    foreach ($package in $packages) {
-        $arguments += "/resource:$($stage.FullName)\$($package.Name),$($package.Name)"
-    }
+    $packageOutput = Join-Path $dist 'packages'
+    New-Item -ItemType Directory -Path $packageOutput -Force | Out-Null
+    foreach ($package in $packages) { Copy-Item -LiteralPath (Join-Path $stage.FullName $package.Name) -Destination (Join-Path $packageOutput $package.Name) -Force }
     foreach ($sourceFile in @('AssemblyInfo.cs', 'Installer.cs', 'LauncherRelease.cs', 'LauncherSelfUpdate.cs', 'LauncherManualUpdate.cs', 'LauncherWindow.cs', 'LauncherDesign.cs', 'LauncherPreview.cs', 'LauncherTest.cs')) {
         $arguments += Join-Path $PSScriptRoot $sourceFile
     }
