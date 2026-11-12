@@ -1,0 +1,5 @@
+/dist/
+/installer/payload/
+*.log
+*.user
+.vs/
