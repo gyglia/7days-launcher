@@ -18,6 +18,7 @@ partial class Installer
         if (args.Length == 2 && args[0] == "--self-update-test") return TestAppUpdate(args[1]);
         if (args.Length == 2 && args[0] == "--launcher-test") return TestLauncher(args[1]);
         if (args.Length == 2 && args[0] == "--schedule-test") return TestSchedule(args[1]);
+        if (args.Length == 2 && args[0] == "--steam-test") return TestSteamDetection(args[1]);
         if (args.Length == 2 && args[0] == "--release-test") {
             try {
                 string text = FetchManifest();
@@ -273,10 +274,7 @@ partial class Installer
                 if (key == null || Convert.ToInt64(key.GetValue("ActiveUser", 0)) == 0) return false;
                 int pid = Convert.ToInt32(key.GetValue("pid", 0));
                 if (pid <= 0) return false;
-                try {
-                    using (var process = Process.GetProcessById(pid))
-                        return !process.HasExited && String.Equals(process.ProcessName, "steam", StringComparison.OrdinalIgnoreCase);
-                } catch (ArgumentException) { return false; } catch (InvalidOperationException) { return false; }
+                return SteamSessionReady(Convert.ToInt64(key.GetValue("ActiveUser",0)),pid,SnapshotProcessName);
             }
         }
 

@@ -100,7 +100,7 @@ try {
     New-Item -ItemType Directory -Path $packageOutput -Force | Out-Null
     foreach ($package in $packages) { Copy-Item -LiteralPath (Join-Path $stage.FullName $package.Name) -Destination (Join-Path $packageOutput $package.Name) -Force }
     foreach ($package in $packages) { Copy-Item -LiteralPath (Join-Path $stage.FullName ($package.Name + '.files.json')) -Destination (Join-Path $packageOutput ($package.Name + '.files.json')) -Force }
-    foreach ($sourceFile in @('AssemblyInfo.cs', 'Installer.cs', 'LauncherRelease.cs', 'LauncherMigration.cs', 'LauncherSchedule.cs', 'LauncherSelfUpdate.cs', 'LauncherManualUpdate.cs', 'LauncherWindow.cs', 'LauncherDesign.cs', 'LauncherPreview.cs', 'LauncherTest.cs')) {
+    foreach ($sourceFile in @('AssemblyInfo.cs', 'Installer.cs', 'LauncherRelease.cs', 'LauncherMigration.cs', 'LauncherSchedule.cs', 'LauncherSteam.cs', 'LauncherSelfUpdate.cs', 'LauncherManualUpdate.cs', 'LauncherWindow.cs', 'LauncherDesign.cs', 'LauncherPreview.cs', 'LauncherTest.cs')) {
         $arguments += Join-Path $PSScriptRoot $sourceFile
     }
     & $compiler @arguments
